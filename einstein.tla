@@ -1,5 +1,7 @@
 ---- MODULE einstein ----
 
+\* IMPORTANT: disable deadlock checking by adding "-deadlock" option
+
 \* https://www.popularmechanics.com/science/math/a24620/riddle-of-the-week-10-einsteins-riddle/
 
 \* Query: Which homeowner has a pet fish?
@@ -7,7 +9,6 @@
 EXTENDS TLC, Sequences, Integers, FiniteSets
 
 CONSTANTS
-  null,
   red, green, white, yellow, blue,
   UK, SE, DK, DE, NO,
   tea, coffee, milk, beer, water,
@@ -18,82 +19,80 @@ VARIABLES houses
 
 TypeOK == TRUE
 
-(*
-The man in the center house drinks milk.
-The Norwegian lives in the first house.
-*)
-
+Numbers == 1 .. 5
 Colors == { red, green, white, yellow, blue }
-Persons == { UK, SE, DK, DE, NO }
+Nationalities == { UK, SE, DK, DE, NO }
 Drinks == { tea, coffee, milk, beer, water }
 Pets == { dog, bird, cat, horse, fish }
 Smokes == { PM, DH, Blend, BM, Prince }
-AllEntities == UNION { Colors, Persons, Drinks, Pets, Smokes }
-
-InitHouses == 
-  [p \in {2, 4, 5} |-> {}]
-  @@ 3 :> { milk }
-  @@ 1 :> { NO }
-
-Positions == DOMAIN InitHouses
+Categories == { Numbers, Colors, Nationalities, Drinks, Pets, Smokes }
 
 (*
 The Englishman lives in the house with red walls.
 The Swede keeps dogs.
 The Dane drinks tea.
 The owner of the house with green walls drinks coffee.
+The man in the center house drinks milk.
+The Norwegian lives in the first house.
 The man who smokes Pall Mall keeps birds.
 The owner of the house with yellow walls smokes Dunhills.
 The man who smokes Blue Masters drinks beer.
 The German smokes Prince.
 *)
 
-Facts(t) ==
-  /\ \E p \in Positions : { UK, red } \subseteq t[p]
-  /\ \E p \in Positions : { SE, dog } \subseteq t[p]
-  /\ \E p \in Positions : { DK, tea } \subseteq t[p]
-  /\ \E p \in Positions : { green, coffee } \subseteq t[p]
-  /\ \E p \in Positions : { PM, bird } \subseteq t[p]
-  /\ \E p \in Positions : { yellow, DH } \subseteq t[p]
-  /\ \E p \in Positions : { BM, beer } \subseteq t[p]
-  /\ \E p \in Positions : { DE, Prince } \subseteq t[p]
+Facts == {
+  { NO, 1 },
+  { 3, milk },  
+  { UK, red },
+  { SE, dog },
+  { DK, tea },
+  { green, coffee },
+  { PM, bird },
+  { yellow, DH },
+  { BM, beer },
+  { DE, Prince }
+}
+
+\* The house with green walls is just to the left of the house with white walls.
+
+NotGreenLeftOfWhite ==
+  { s \in { { { n, green }, { m, white } } : n \in Numbers, m \in Numbers } :
+    \E h \in s, k \in s :
+      /\ h # k 
+      /\ \E n \in h \intersect Numbers, m \in k \intersect Numbers :
+        n + 1 # m
+  }
 
 (*
-The house with green walls is just to the left of the house with white walls.
 The Blend smoker has a neighbor who keeps cats.
 The man who keeps horses lives next to the Dunhill smoker.
 The Norwegian lives next to the house with blue walls.
 The Blend smoker has a neighbor who drinks water.
 *)  
 
-Neighbors(p) == { p - 1, p + 1 } \intersect Positions
+Exclusions ==
+  NotGreenLeftOfWhite
 
-Rules(t) ==
-  /\ \E p \in Positions \ { 5 } : green \in t[p] /\ white \in t[p + 1]
-  /\ \E p \in Positions : Blend \in t[p] /\ \E q \in Neighbors(p) : cat \in t[q]
-  /\ \E p \in Positions : horse \in t[p] /\ \E q \in Neighbors(p) : DH \in t[q]
-  /\ \E p \in Positions : NO \in t[p] /\ \E q \in Neighbors(p) : blue \in t[q]
-  /\ \E p \in Positions : Blend \in t[p] /\ \E q \in Neighbors(p) : water \in t[q]
+\* TODO add additional exclusions corresponding to the rules.
 
-EntitiesPlaced == UNION { houses[p] : p \in Positions }
+Populate ==
+  \E h \in houses, c \in Categories : 
+    /\ h \intersect c = {}
+    /\ \E x \in c \ UNION houses : 
+      houses' = (houses \ { h }) \union { h \union { x } }
 
-Init == houses = InitHouses
+Init == houses = { { k } : k \in Numbers }
 
-TryFrom(set) ==
-  \E p \in Positions : 
-    /\ houses[p] \intersect set = {}
-    /\ \E c \in set \ EntitiesPlaced :
-      /\ houses' = [houses EXCEPT ![p] = houses[p] \union { c }]
-
-Next == 
-  \/ TryFrom(Colors)
-  \/ TryFrom(Persons)
-  \/ TryFrom(Drinks)
-  \/ TryFrom(Pets)
-  \/ TryFrom(Smokes)
+Next == Populate
 
 Spec == Init /\ [][Next]_houses 
 
-Unsolved ==  ~ (EntitiesPlaced # AllEntities => Facts(houses) /\ Rules(houses))
+Solved == 
+  /\ Cardinality(houses) = Cardinality(Numbers)
+  /\ \A k \in houses : Cardinality(k) = Cardinality(Categories)
+  /\ \A f \in Facts : \E k \in houses : f \subseteq k /\ ~ \E h \in houses \ { k } : f \subseteq h
+  /\ ~ \E k \in houses, f \in Exclusions : f \subseteq k
+
+Unsolved == ~ Solved
 
 ====
