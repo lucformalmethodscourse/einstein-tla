@@ -1,7 +1,5 @@
 ---- MODULE superheroes ----
 
-\* IMPORTANT: disable deadlock checking by adding "-deadlock" option
-
 \* https://www.brainzilla.com/logic/logic-grid/superheroes/
 
 EXTENDS TLC, Integers, FiniteSets
@@ -33,28 +31,25 @@ Facts == {
 Tony doesn't like Superperson.
 *)
 
-Exclusions ==
-  {
-    { Tony, Superperson }
-  }
-
-Populate ==
-  \E h \in kids, c \in Categories : 
-    /\ h \intersect c = {}
-    /\ \E x \in c \ UNION kids : 
-      kids' = (kids \ { h }) \union { h \union { x } }
+Exclusions == {
+  { Tony, Superperson }
+}
 
 Init == kids = { { k } : k \in Kids }
 
-Next == Populate
+Next ==
+  \E h \in kids, c \in Categories \ { Kids }: 
+    /\ h \intersect c = {}
+    /\ \E x \in c \ UNION kids : 
+      kids' = (kids \ { h }) \union { h \union { x } }
 
 Spec == Init /\ [][Next]_kids
 
 Solved == 
   /\ Cardinality(kids) = Cardinality(Kids)
   /\ \A k \in kids : Cardinality(k) = Cardinality(Categories)
-  /\ \A f \in Facts : \E k \in kids : f \subseteq k /\ ~ \E h \in kids \ { k } : f \subseteq h
-  /\ ~ \E k \in kids, f \in Exclusions : f \subseteq k
+  /\ \A f \in Facts : \E k \in kids : f \subseteq k
+  /\ ~ \E f \in Exclusions, k \in kids : f \subseteq k
 
 Unsolved == ~ Solved
   
