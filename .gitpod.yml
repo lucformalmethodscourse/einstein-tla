@@ -1,0 +1,5 @@
+tasks:
+  - init: |
+      wget https://github.com/informalsystems/apalache/releases/latest/download/apalache.tgz
+      sudo tar -C /opt -xf apalache.tgz
+      rm apalache.tgz
